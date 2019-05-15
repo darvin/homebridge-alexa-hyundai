@@ -9,7 +9,7 @@ sudo apt-get install -y nodejs libavahi-compat-libdnssd-dev
 ```
 * Install homebridge and this plugin
 ```sh
-sudo npm install -g --unsafe-perm homebridge homebridge-pi-thermostat
+sudo npm install -g --unsafe-perm homebridge homebridge-alexa-hyundai
 ```
 * Add the accessory config to your homebridge config file located at this path `~/.homebridge/config.json`.
 ```json
