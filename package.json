@@ -21,6 +21,7 @@
   "author": "Sergey Klimov <sergey.v.klimov@gmail.com>",
   "license": "ISC",
   "dependencies": {
+    "say": "^0.15.0"
   },
   "devDependencies": {
     "eslint": "^4.13.1",

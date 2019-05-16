@@ -10,16 +10,13 @@
 
   "accessories": [
     {
-      "accessory": "Thermostat",
-      "name": "Pi Thermostat",
-      "fanRelayPin": 26,
-      "heatRelayPin": 21,
-      "coolRelayPin": 20,
-      "temperatureSensorPin": 4,
-      "minimumOnOffTime": 120000,
-      "blowerTurnOffTime": 80000,
-      "startDelay": 10000,
-      "temperatureCheckInterval": 10000
+      "accessory": "AlexaHyundai",
+      "name": "My Sonata",
+      "serviceName": "BlueLink",
+      "carName": "Sonata",
+      "heatingCoolingTimeMin":15,
+      "pin": "3410",
+      "delayBeforePinRequestMs":3000
     }
   ],
 

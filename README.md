@@ -27,8 +27,11 @@ sudo npm install -g --unsafe-perm homebridge homebridge-alexa-hyundai
       "name": "My Sonata",
       "serviceName": "BlueLink",
       "carName": "Sonata",
-      "heatingCoolingTimeMin":15
+      "heatingCoolingTimeMin":15,
+      "pin": "3410",
+      "delayBeforePinRequestMs":3000
     }
+
   ],
   "platforms": []
 }

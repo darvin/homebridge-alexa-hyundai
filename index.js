@@ -1,12 +1,6 @@
-const gpio = process.platform === 'linux' ? require('rpi-gpio') : {
-  setMode: () => {},
-  setup: () => {},
-  write: () => {}
-};
-const dhtSensor = process.platform === 'linux' ? require('node-dht-sensor') : {
-  read: (type, pin, fn) => { fn(null, 22, 50); }
-};
-gpio.setMode(gpio.MODE_BCM);
+
+const say = require('say')
+
 
 let Service, Characteristic, HeatingCoolingStateToRelayPin;
 const OFF = true;
@@ -15,41 +9,26 @@ const ON = false;
 module.exports = function(homebridge) {
   Service = homebridge.hap.Service;
   Characteristic = homebridge.hap.Characteristic;
-  homebridge.registerAccessory('homebridge-pi-thermostat', 'Thermostat', Thermostat);
+  homebridge.registerAccessory('homebridge-alexa-hyundai', 'AlexaHyundai', Thermostat);
 };
 
 class Thermostat {
   constructor(log, config) {
     this.log = log;
     this.name = config.name;
-    this.maxTemperature = config.maxTemperature || 35;
-    this.minTemperature = config.minTemperature || 0;
-    this.fanRelayPin = config.fanRelayPin || 26;
-    this.heatRelayPin = config.heatRelayPin || 21;
-    this.coolRelayPin = config.coolRelayPin || 20;
-    this.dhtSensorType = config.dhtSensorType || 22;
-    this.temperatureSensorPin = config.temperatureSensorPin || 4;
-    this.minimumOnOffTime = config.minimumOnOffTime || 120000; // In milliseconds
-    this.blowerTurnOffTime = config.blowerTurnOffTime || 80000; // In milliseconds
-    this.startDelay = config.startDelay || 10000; // In milliseconds
-    this.temperatureCheckInterval = config.temperatureCheckInterval || 10000; // In milliseconds
+    this.maxTemperature = config.maxTemperature || 83;
+    this.minTemperature = config.minTemperature || 61;
+    this.delayBeforePinRequestMs = config.config || 2000;
+    this.pin = config.pin || "0000";
+    this.serviceName = config.serviceName || "BlueLink";
+    this.carName = config.carName || "Sonata";
 
-    HeatingCoolingStateToRelayPin = {
-      [Characteristic.CurrentHeatingCoolingState.HEAT]: this.heatRelayPin,
-      [Characteristic.CurrentHeatingCoolingState.COOL]: this.coolRelayPin
-    };
 
-    gpio.setup(this.fanRelayPin, gpio.DIR_HIGH);
-    gpio.setup(this.heatRelayPin, gpio.DIR_HIGH);
-    gpio.setup(this.coolRelayPin, gpio.DIR_HIGH);
-
-    this.currentTemperature = 21;
-    this.currentRelativeHumidity = 50;
-    this.targetTemperature = 21;
+    this.currentTemperature = 78;
+    this.targetTemperature = 78;
 
     this.heatingThresholdTemperature = 18;
     this.coolingThresholdTemperature = 24;
-    this.isFanRunning = false;
 
     //Characteristic.TemperatureDisplayUnits.CELSIUS = 0;
     //Characteristic.TemperatureDisplayUnits.FAHRENHEIT = 1;
@@ -69,9 +48,6 @@ class Thermostat {
     this.targetHeatingCoolingState = Characteristic.TargetHeatingCoolingState.OFF;
 
     this.thermostatService = new Service.Thermostat(this.name);
-    this.fanService = new Service.Fan(`${this.name} Fan`);
-
-    setInterval(() => this.readTemperatureFromSensor(), this.temperatureCheckInterval);
   }
 
   get currentlyRunning() {
@@ -103,6 +79,31 @@ class Thermostat {
     }
   }
 
+  sendTurnOnCommand() {
+    var messageSpeakingSpeed = 1.0;
+    var message = "Alexa tell "+this.serviceName+ " to start "+this.carName+" and set temperature for "+this.targetTemperature;
+    this.currentTemperature = this.targetTemperature;
+    this.currentHeatingCoolingState = this.targetHeatingCoolingState;
+    say.speak(message, messageSpeakingSpeed, (err) => {
+      if (err) {
+        return console.error(err)
+      }
+      console.log("SAID: "+message);
+      setTimeout(() => {
+        var pinMessage = ""+this.pin;
+        say.speak(pinMessage, messageSpeakingSpeed, (err) => {
+        if (err) {
+          return console.error(err)
+        }
+        console.log("SAID: "+setTimeout);
+      });
+
+      }, this.delayBeforePinRequestMs);
+
+    });
+
+  }
+
   clearTurnOnInstruction() {
     this.log('CLEARING Turn On instruction');
     clearTimeout(this.startSystemTimer);
@@ -115,7 +116,7 @@ class Thermostat {
         this.log(`STARTING ${this.systemStateName(systemToTurnOn)} in ${this.startDelay / 1000} second(s)`);
         this.startSystemTimer = setTimeout(() => {
           this.log(`START ${this.systemStateName(systemToTurnOn)}`);
-          gpio.write(HeatingCoolingStateToRelayPin[systemToTurnOn], ON);
+          this.sendTurnOnCommand();
           this.thermostatService.setCharacteristic(Characteristic.CurrentHeatingCoolingState, systemToTurnOn);
         }, this.startDelay);
       } else {
@@ -126,11 +127,6 @@ class Thermostat {
     }
   }
 
-  turnFan(state) {
-    this.isFanRunning = state === ON;
-    this.log(`Turning Fan ${this.isFanRunning ? 'ON' : 'OFF'}`);
-    gpio.write(this.fanRelayPin, state);
-  }
 
   get timeSinceLastHeatingCoolingStateChange() {
     return new Date() - this.lastCurrentHeatingCoolingStateChangeTime;
@@ -139,7 +135,7 @@ class Thermostat {
   turnOffSystem() {
     if (!this.stopSystemTimer) {
       this.log(`STOP ${this.currentlyRunning} | Blower will turn off in ${this.blowerTurnOffTime / 1000} second(s)`);
-      gpio.write(HeatingCoolingStateToRelayPin[this.currentHeatingCoolingState], OFF);
+      // gpio.write(HeatingCoolingStateToRelayPin[this.currentHeatingCoolingState], OFF);
       this.stopSystemTimer = setTimeout(() => {
         this.thermostatService.setCharacteristic(Characteristic.CurrentHeatingCoolingState, Characteristic.CurrentHeatingCoolingState.OFF);
       }, this.blowerTurnOffTime);
@@ -179,19 +175,6 @@ class Thermostat {
     } else if (this.startSystemTimer) {
       this.clearTurnOnInstruction();
     }
-  }
-
-  readTemperatureFromSensor() {
-    dhtSensor.read(this.dhtSensorType, this.temperatureSensorPin, (err, temperature, humidity) => {
-      if (!err) {
-        this.currentTemperature = temperature;
-        this.currentRelativeHumidity = humidity;
-        this.thermostatService.setCharacteristic(Characteristic.CurrentTemperature, this.currentTemperature);
-        this.thermostatService.setCharacteristic(Characteristic.CurrentRelativeHumidity, this.currentRelativeHumidity);
-      } else {
-        this.log('ERROR Getting temperature');
-      }
-    });
   }
 
   getServices() {
@@ -284,13 +267,7 @@ class Thermostat {
         callback(null);
       });
 
-    // Get Humidity
-    this.thermostatService
-      .getCharacteristic(Characteristic.CurrentRelativeHumidity)
-      .on('get', callback => {
-        this.log('CurrentRelativeHumidity:', this.currentRelativeHumidity);
-        callback(null, this.currentRelativeHumidity);
-      });
+
 
     // Auto max temperature
     this.thermostatService
@@ -334,23 +311,8 @@ class Thermostat {
         callback(null, this.name);
       });
 
-    this.fanService.getCharacteristic(Characteristic.On)
-      .on('get', callback => {
-        callback(null, this.isFanRunning);
-      })
-      .on('set', (value, callback) => {
-        if (this.currentlyRunning === 'Off') {
-          if (value && !this.isFanRunning) {
-            this.turnFan(ON);
-          } else if (!value && this.isFanRunning) {
-            this.turnFan(OFF);
-          }
-          callback(null);
-        } else {
-          callback(new Error('Heating/Cooling System is running so cannot turn on/off the fan'));
-        }
-      });
 
-    return [informationService, this.thermostatService, this.fanService];
+
+    return [informationService, this.thermostatService];
   }
 }
