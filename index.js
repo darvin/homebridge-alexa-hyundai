@@ -23,12 +23,12 @@ class Thermostat {
     this.serviceName = config.serviceName || "BlueLink";
     this.carName = config.carName || "Sonata";
 
+    this.startDelay = 800;
 
     this.currentTemperature = 78;
     this.targetTemperature = 78;
 
-    this.heatingThresholdTemperature = 18;
-    this.coolingThresholdTemperature = 24;
+    this.heatingCoolingThresholdTemperature = 75;
 
     //Characteristic.TemperatureDisplayUnits.CELSIUS = 0;
     //Characteristic.TemperatureDisplayUnits.FAHRENHEIT = 1;
@@ -54,15 +54,6 @@ class Thermostat {
     return this.systemStateName(this.currentHeatingCoolingState);
   }
 
-  get shouldTurnOnHeating() {
-    return (this.targetHeatingCoolingState === Characteristic.TargetHeatingCoolingState.HEAT && this.currentTemperature < this.targetTemperature)
-      || (this.targetHeatingCoolingState === Characteristic.TargetHeatingCoolingState.AUTO && this.currentTemperature < this.heatingThresholdTemperature);
-  }
-
-  get shouldTurnOnCooling() {
-    return (this.targetHeatingCoolingState === Characteristic.TargetHeatingCoolingState.COOL && this.currentTemperature > this.targetTemperature)
-      || (this.targetHeatingCoolingState === Characteristic.TargetHeatingCoolingState.AUTO && this.currentTemperature > this.coolingThresholdTemperature);
-  }
 
   identify(callback) {
     this.log('Identify requested!');
@@ -84,6 +75,10 @@ class Thermostat {
     var message = "Alexa tell "+this.serviceName+ " to start "+this.carName+" and set temperature for "+this.targetTemperature;
     this.currentTemperature = this.targetTemperature;
     this.currentHeatingCoolingState = this.targetHeatingCoolingState;
+    this.thermostatService.setCharacteristic(Characteristic.CurrentTemperature, this.currentTemperature);
+
+    console.log("GONNA SAY: "+message);
+
     say.speak(message, messageSpeakingSpeed, (err) => {
       if (err) {
         return console.error(err)
@@ -104,11 +99,18 @@ class Thermostat {
 
   }
 
-  clearTurnOnInstruction() {
-    this.log('CLEARING Turn On instruction');
-    clearTimeout(this.startSystemTimer);
-    this.startSystemTimer = null;
+  sendTurnOffCommand() {
+    var messageSpeakingSpeed = 1.0;
+    var message = "Alexa tell "+this.serviceName+ " to stop "+this.carName+" ";
+    console.log("GONNA SAY: "+message);
+    say.speak(message, messageSpeakingSpeed, (err) => {
+      if (err) {
+        return console.error(err)
+      }
+      console.log("SAID: "+message);
+    });
   }
+
 
   turnOnSystem(systemToTurnOn) {
     if (this.currentHeatingCoolingState === Characteristic.CurrentHeatingCoolingState.OFF) {
@@ -134,46 +136,38 @@ class Thermostat {
 
   turnOffSystem() {
     if (!this.stopSystemTimer) {
-      this.log(`STOP ${this.currentlyRunning} | Blower will turn off in ${this.blowerTurnOffTime / 1000} second(s)`);
-      // gpio.write(HeatingCoolingStateToRelayPin[this.currentHeatingCoolingState], OFF);
-      this.stopSystemTimer = setTimeout(() => {
-        this.thermostatService.setCharacteristic(Characteristic.CurrentHeatingCoolingState, Characteristic.CurrentHeatingCoolingState.OFF);
-      }, this.blowerTurnOffTime);
+      this.sendTurnOffCommand();
+      this.thermostatService.setCharacteristic(Characteristic.CurrentHeatingCoolingState, Characteristic.CurrentHeatingCoolingState.OFF)
     } else {
-      this.log(`INFO ${this.currentlyRunning} is stopped. Blower will turn off soon...`);
+      console.log(`INFO ${this.currentlyRunning} is already stopped.`);
     }
   }
 
   updateSystem() {
+        console.log("called update1");
+
     if (this.timeSinceLastHeatingCoolingStateChange < this.minimumOnOffTime) {
       const waitTime = this.minimumOnOffTime - this.timeSinceLastHeatingCoolingStateChange;
-      this.log(`INFO Need to wait ${waitTime / 1000} second(s) before state changes.`);
+      console.log(`INFO Need to wait ${waitTime / 1000} second(s) before state changes.`);
       return;
     }
 
-    if (this.currentHeatingCoolingState === Characteristic.CurrentHeatingCoolingState.OFF
-        && this.targetHeatingCoolingState !== Characteristic.TargetHeatingCoolingState.OFF) {
-      if (this.shouldTurnOnHeating) {
-        this.turnOnSystem(Characteristic.CurrentHeatingCoolingState.HEAT);
-      } else if (this.shouldTurnOnCooling) {
-        this.turnOnSystem(Characteristic.CurrentHeatingCoolingState.COOL);
-      } else if (this.startSystemTimer) {
-        this.clearTurnOnInstruction();
+    console.log("called update2 targer state "+ this.targetHeatingCoolingState + "current state "+ this.currentHeatingCoolingState + " taget temp " + this.targetTemperature + "  current  "+ this.currentTemperature);
+    if ( (this.targetHeatingCoolingState !== Characteristic.TargetHeatingCoolingState.OFF && this.currentHeatingCoolingState == Characteristic.TargetHeatingCoolingState.OFF)
+      || (this.targetHeatingCoolingState !== Characteristic.TargetHeatingCoolingState.OFF
+              && this.targetTemperature !== this.currentTemperature)) {
+          console.log("called update turning on");
+
+      if (this.targetTemperature < this.heatingCoolingThresholdTemperature) {
+          this.turnOnSystem(Characteristic.CurrentHeatingCoolingState.COOL);
+      } else {
+          this.turnOnSystem(Characteristic.CurrentHeatingCoolingState.HEAT);
       }
     } else if (this.currentHeatingCoolingState !== Characteristic.CurrentHeatingCoolingState.OFF
         && this.targetHeatingCoolingState === Characteristic.TargetHeatingCoolingState.OFF) {
+                console.log("called update turning off");
+
       this.turnOffSystem();
-    } else if (this.currentHeatingCoolingState !== Characteristic.CurrentHeatingCoolingState.OFF
-              && this.targetHeatingCoolingState !== Characteristic.TargetHeatingCoolingState.OFF) {
-      if (this.shouldTurnOnHeating) {
-        this.turnOnSystem(Characteristic.CurrentHeatingCoolingState.HEAT);
-      } else if (this.shouldTurnOnCooling) {
-        this.turnOnSystem(Characteristic.CurrentHeatingCoolingState.COOL);
-      } else {
-        this.turnOffSystem();
-      }
-    } else if (this.startSystemTimer) {
-      this.clearTurnOnInstruction();
     }
   }
 
@@ -181,9 +175,9 @@ class Thermostat {
     const informationService = new Service.AccessoryInformation();
 
     informationService
-      .setCharacteristic(Characteristic.Manufacturer, 'Encore Dev Labs')
-      .setCharacteristic(Characteristic.Model, 'Pi Thermostat')
-      .setCharacteristic(Characteristic.SerialNumber, 'Raspberry Pi 3');
+      .setCharacteristic(Characteristic.Manufacturer, 'AlexaHyundai')
+      .setCharacteristic(Characteristic.Model, this.carName)
+      .setCharacteristic(Characteristic.SerialNumber, 'fake serial');
 
     // Off, Heat, Cool
     this.thermostatService
@@ -278,12 +272,11 @@ class Thermostat {
         minStep: 0.1
       })
       .on('get', callback => {
-        this.log('CoolingThresholdTemperature:', this.coolingThresholdTemperature);
-        callback(null, this.coolingThresholdTemperature);
+        this.log('CoolingThresholdTemperature:', this.heatingCoolingThresholdTemperature);
+        callback(null, this.heatingCoolingThresholdTemperature);
       })
       .on('set', (value, callback) => {
-        this.log('SET CoolingThresholdTemperature from', this.coolingThresholdTemperature, 'to', value);
-        this.coolingThresholdTemperature = value;
+        this.log('SET CoolingThresholdTemperature from', this.heatingCoolingThresholdTemperature, 'to', value);
         callback(null);
       });
 
@@ -296,12 +289,11 @@ class Thermostat {
         minStep: 0.1
       })
       .on('get', callback => {
-        this.log('HeatingThresholdTemperature:', this.heatingThresholdTemperature);
-        callback(null, this.heatingThresholdTemperature);
+        this.log('HeatingThresholdTemperature:', this.heatingCoolingThresholdTemperature);
+        callback(null, this.heatingCoolingThresholdTemperature);
       })
       .on('set', (value, callback) => {
-        this.log('SET HeatingThresholdTemperature from', this.heatingThresholdTemperature, 'to', value);
-        this.heatingThresholdTemperature = value;
+        this.log('SET HeatingThresholdTemperature from', this.heatingCoolingThresholdTemperature, 'to', value);
         callback(null);
       });
 
