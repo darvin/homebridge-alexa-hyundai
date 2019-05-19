@@ -1,31 +1,61 @@
 {
-  "name": "homebridge-alexa-hyundai",
-  "version": "0.0.1",
-  "description": "Hombridge plugin for controlling hyundai cars with alexa voice commands",
-  "main": "index.js",
-  "engines": {
-    "node": ">=6.12.2",
-    "homebridge": ">=0.4.33"
-  },
-  "repository": {
+  "_from": "git+https://github.com/darvin/homebridge-alexa-hyundai.git",
+  "_id": "homebridge-alexa-hyundai@0.0.1",
+  "_inBundle": false,
+  "_integrity": "",
+  "_location": "/homebridge-alexa-hyundai",
+  "_phantomChildren": {},
+  "_requested": {
     "type": "git",
-    "url": "https://github.com/darvin/homebridge-alexa-hyundai.git"
+    "raw": "https://github.com/darvin/homebridge-alexa-hyundai.git",
+    "rawSpec": "https://github.com/darvin/homebridge-alexa-hyundai.git",
+    "saveSpec": "git+https://github.com/darvin/homebridge-alexa-hyundai.git",
+    "fetchSpec": "https://github.com/darvin/homebridge-alexa-hyundai.git",
+    "gitCommittish": null
   },
-  "keywords": [
-    "homebridge-plugin",
-    "homebridge"
+  "_requiredBy": [
+    "#USER",
+    "/"
   ],
-  "scripts": {
-    "lint": "eslint ."
+  "_resolved": "git+https://github.com/darvin/homebridge-alexa-hyundai.git#089b404f530fc7be1407e53e805d5d7865098689",
+  "_spec": "https://github.com/darvin/homebridge-alexa-hyundai.git",
+  "_where": "/homebridge",
+  "author": {
+    "name": "Sergey Klimov",
+    "email": "sergey.v.klimov@gmail.com"
   },
-  "author": "Sergey Klimov <sergey.v.klimov@gmail.com>",
-  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/darvin/homebridge-alexa-hyundai/issues"
+  },
+  "bundleDependencies": false,
   "dependencies": {
     "say": "^0.15.0"
   },
+  "deprecated": false,
+  "description": "Hombridge plugin for controlling hyundai cars with alexa voice commands",
   "devDependencies": {
     "eslint": "^4.13.1",
     "eslint-plugin-node": "^5.2.1",
     "eslint-plugin-standard": "^3.0.1"
-  }
+  },
+  "engines": {
+    "homebridge": ">=0.4.33",
+    "node": ">=6.12.2"
+  },
+  "homepage": "https://github.com/darvin/homebridge-alexa-hyundai#readme",
+  "keywords": [
+    "homebridge-plugin",
+    "homebridge"
+  ],
+  "license": "ISC",
+  "main": "index.js",
+  "name": "homebridge-alexa-hyundai",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/darvin/homebridge-alexa-hyundai.git"
+  },
+  "scripts": {
+    "lint": "eslint ."
+  },
+  "version": "0.0.1"
 }

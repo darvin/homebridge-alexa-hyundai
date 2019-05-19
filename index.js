@@ -16,23 +16,25 @@ class Thermostat {
   constructor(log, config) {
     this.log = log;
     this.name = config.name;
-    this.maxTemperature = config.maxTemperature || 83;
-    this.minTemperature = config.minTemperature || 61;
-    this.delayBeforePinRequestMs = config.config || 2000;
+    this.maxTemperature = config.maxTemperature || 28;
+    this.minTemperature = config.minTemperature || 18;
+    this.delayBeforePinRequestMs = config.config || 10000;
     this.pin = config.pin || "0000";
     this.serviceName = config.serviceName || "BlueLink";
     this.carName = config.carName || "Sonata";
-
+    this.voice = config.voice || "voice_kal_diphone";
+    this.voiceSpeed = config.voiceSpeed || 1.0;
     this.startDelay = 800;
+    this.heatingCoolingTimeMs = (config.heatingCoolingTimeMin || 10) * 60 * 1000;
 
-    this.currentTemperature = 78;
-    this.targetTemperature = 78;
+    this.currentTemperature = 24;
+    this.targetTemperature = 24;
 
-    this.heatingCoolingThresholdTemperature = 75;
+    this.heatingCoolingThresholdTemperature = 24;
 
     //Characteristic.TemperatureDisplayUnits.CELSIUS = 0;
     //Characteristic.TemperatureDisplayUnits.FAHRENHEIT = 1;
-    this.temperatureDisplayUnits = Characteristic.TemperatureDisplayUnits.FAHRENHEIT;
+    this.temperatureDisplayUnits = Characteristic.TemperatureDisplayUnits.CELSIUS;
 
     // The value property of CurrentHeatingCoolingState must be one of the following:
     //Characteristic.CurrentHeatingCoolingState.OFF = 0;
@@ -71,28 +73,26 @@ class Thermostat {
   }
 
   sendTurnOnCommand() {
-    var messageSpeakingSpeed = 1.0;
-    var message = "Alexa tell "+this.serviceName+ " to start "+this.carName+" and set temperature for "+this.targetTemperature;
+    var unitsText = "";
+    if (this.temperatureDisplayUnits == Characteristic.TemperatureDisplayUnits.CELSIUS) {
+      unitsText = "CELSIUS";
+    } else if (this.temperatureDisplayUnits == Characteristic.TemperatureDisplayUnits.FAHRENHEIT) {
+      unitsText = "FAHRENHEIT";
+    }
+    var message = "Alexa . . . , Tell "+this.serviceName+ " to start "+this.carName+" and set temperature for "+this.targetTemperature + " " + unitsText;
     this.currentTemperature = this.targetTemperature;
     this.currentHeatingCoolingState = this.targetHeatingCoolingState;
     this.thermostatService.setCharacteristic(Characteristic.CurrentTemperature, this.currentTemperature);
-
-    console.log("GONNA SAY: "+message);
-
-    say.speak(message, messageSpeakingSpeed, (err) => {
+    say.speak(message, this.voice, this.voiceSpeed, (err) => {
       if (err) {
         return console.error(err)
       }
-      console.log("SAID: "+message);
       setTimeout(() => {
-        var pinMessage = ""+this.pin;
-        say.speak(pinMessage, messageSpeakingSpeed, (err) => {
-        if (err) {
-          return console.error(err)
-        }
-        console.log("SAID: "+setTimeout);
-      });
-
+        say.speak(""+this.pin, this.voice, this.voiceSpeed, (err) => {
+          if (err) {
+            return console.error(err)
+          }
+        });
       }, this.delayBeforePinRequestMs);
 
     });
@@ -101,13 +101,18 @@ class Thermostat {
 
   sendTurnOffCommand() {
     var messageSpeakingSpeed = 1.0;
-    var message = "Alexa tell "+this.serviceName+ " to stop "+this.carName+" ";
-    console.log("GONNA SAY: "+message);
-    say.speak(message, messageSpeakingSpeed, (err) => {
+    var message = "Alexa . . . , Tell "+this.serviceName+ " to stop "+this.carName+" ";
+    say.speak(message, this.voice, this.voiceSpeed, (err) => {
       if (err) {
         return console.error(err)
       }
-      console.log("SAID: "+message);
+      setTimeout(() => {
+        say.speak(""+this.pin, this.voice, this.voiceSpeed, (err) => {
+          if (err) {
+            return console.error(err)
+          }
+        });
+      }, this.delayBeforePinRequestMs);
     });
   }
 
@@ -120,6 +125,11 @@ class Thermostat {
           this.log(`START ${this.systemStateName(systemToTurnOn)}`);
           this.sendTurnOnCommand();
           this.thermostatService.setCharacteristic(Characteristic.CurrentHeatingCoolingState, systemToTurnOn);
+          setTimeout( () => {
+              this.log("Ended heating/cooling");
+              this.thermostatService.setCharacteristic(Characteristic.CurrentHeatingCoolingState, Characteristic.CurrentHeatingCoolingState.OFF);
+              this.thermostatService.setCharacteristic(Characteristic.TargetHeatingCoolingState, Characteristic.TargetHeatingCoolingState.OFF);
+          }, this.heatingCoolingTimeMs);
         }, this.startDelay);
       } else {
         this.log(`STARTING ${this.systemStateName(systemToTurnOn)} soon...`);
@@ -139,24 +149,19 @@ class Thermostat {
       this.sendTurnOffCommand();
       this.thermostatService.setCharacteristic(Characteristic.CurrentHeatingCoolingState, Characteristic.CurrentHeatingCoolingState.OFF)
     } else {
-      console.log(`INFO ${this.currentlyRunning} is already stopped.`);
+      this.log(`INFO ${this.currentlyRunning} is already stopped.`);
     }
   }
 
   updateSystem() {
-        console.log("called update1");
-
     if (this.timeSinceLastHeatingCoolingStateChange < this.minimumOnOffTime) {
       const waitTime = this.minimumOnOffTime - this.timeSinceLastHeatingCoolingStateChange;
-      console.log(`INFO Need to wait ${waitTime / 1000} second(s) before state changes.`);
       return;
     }
 
-    console.log("called update2 targer state "+ this.targetHeatingCoolingState + "current state "+ this.currentHeatingCoolingState + " taget temp " + this.targetTemperature + "  current  "+ this.currentTemperature);
     if ( (this.targetHeatingCoolingState !== Characteristic.TargetHeatingCoolingState.OFF && this.currentHeatingCoolingState == Characteristic.TargetHeatingCoolingState.OFF)
       || (this.targetHeatingCoolingState !== Characteristic.TargetHeatingCoolingState.OFF
               && this.targetTemperature !== this.currentTemperature)) {
-          console.log("called update turning on");
 
       if (this.targetTemperature < this.heatingCoolingThresholdTemperature) {
           this.turnOnSystem(Characteristic.CurrentHeatingCoolingState.COOL);
@@ -165,8 +170,6 @@ class Thermostat {
       }
     } else if (this.currentHeatingCoolingState !== Characteristic.CurrentHeatingCoolingState.OFF
         && this.targetHeatingCoolingState === Characteristic.TargetHeatingCoolingState.OFF) {
-                console.log("called update turning off");
-
       this.turnOffSystem();
     }
   }
